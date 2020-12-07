@@ -1,0 +1,138 @@
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/jszip.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.8.0/xlsx.js"></script>
+<script src="https://cdn.jsdelivr.net/jsbarcode/3.3.16/barcodes/JsBarcode.code128.min.js"></script>
+<style>
+  body{
+    margin: 0;
+    padding: 0;
+  }
+  .a4 {
+    height: 1120px;
+    width: 792px;
+    /* border: 1px solid; */
+    box-sizing: border-box;
+    padding: 20px 10px;
+  }
+  .block {
+    height: 77px;
+    width: 192px;
+    /* border: 1px solid; */
+    box-sizing: border-box;
+    float: left;
+    display: flex;
+    align-items: center;
+  }
+  .price{
+    font-size: 20px;
+    font-weight: bold;
+  }
+  .barcode {
+    width: 100px;
+    height: 60px;
+  }
+  .text{
+    font-size: 9px;
+    padding: 3px 20px 0 16px;
+  }
+</style>
+<script>
+  var ExcelToJSON = function () {
+    this.parseExcel = function (file) {
+      var reader = new FileReader();
+      let func = this.buildBlocks;
+      reader.onload = function (e) {
+        var data = e.target.result;
+        var workbook = XLSX.read(data, {
+          type: "binary",
+        });
+        workbook.SheetNames.forEach(function (sheetName) {
+          // Here is your object
+          var XL_row_object = XLSX.utils.sheet_to_row_object_array(
+            workbook.Sheets[sheetName]
+          );
+          var json_object = JSON.stringify(XL_row_object);
+          console.log(JSON.parse(json_object));
+          jQuery("#xlx_json").val(json_object);
+
+          let data = XL_row_object.reduce((acc, value) => {
+            for (let i = 0; i < Number(value["Current stock"]); i++) {
+              acc.push({
+                code: value["Item Code"],
+                sp: value["Selling price"],
+                name: value["Item name*"],
+              });
+            }
+            return acc;
+          }, []);
+          let j = 1;
+          document.getElementById("upload-form").style.display = "none";
+          while (data.length > 0) {
+            let d = data.splice(0, 56);
+            func(d, j++);
+          }
+        });
+      };
+
+      reader.onerror = function (ex) {
+        console.log(ex);
+      };
+
+      reader.readAsBinaryString(file);
+    };
+
+    this.buildBlocks = function (data, j) {
+      let elem = document.createElement("div");
+      let wrpr = document.getElementById("cntnr");
+      wrpr.appendChild(elem);
+      elem.setAttribute("class", `a4`);
+      for (let i = 0; i < data.length; i++) {
+        let d = document.createElement("div");
+        let r = document.createElement("div");
+        let s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+        s.setAttribute("id", `b-${j}-${i}-${data[i].code}`);
+        s.setAttribute("class", `barcode`);
+        let t = document.createElement("div");
+        t.setAttribute("class","text");
+        t.innerText = `${data[i].name} size 12`;
+        r.appendChild(t);
+        d.setAttribute("class", "block");
+        elem.appendChild(d);
+        r.appendChild(s);
+        let price = document.createElement("div");
+        price.setAttribute("class","price");
+        price.innerText = `₹${data[i].sp}`;
+        d.appendChild(r);
+        d.appendChild(price);
+      }
+
+      for (let i = 0; i < data.length; i++) {
+        JsBarcode(`#b-${j}-${i}-${data[i].code}`, data[i].code, {
+          format: "CODE128",
+          displayValue: true,
+        });
+      }
+    };
+  };
+
+  function handleFileSelect(evt) {
+    var files = evt.target.files; // FileList object
+    var xl2json = new ExcelToJSON();
+    xl2json.parseExcel(files[0]);
+    // xl2json.buildBlocks();
+  }
+</script>
+
+<form enctype="multipart/form-data" id="upload-form">
+  <input id="upload" type="file" name="files[]" />
+</form>
+
+<!-- <textarea class="form-control" rows="35" cols="120" id="xlx_json"></textarea> -->
+<div id="cntnr">
+</div>
+<svg id="code128"></svg>
+<script>
+  document
+    .getElementById("upload")
+    .addEventListener("change", handleFileSelect, false);
+</script>
